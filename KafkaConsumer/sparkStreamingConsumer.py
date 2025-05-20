@@ -107,7 +107,9 @@ try:
     def process_batch(df, epoch_id):
         try:
             count = df.count()
-            logger.info(f"Processing batch {epoch_id} with {count} records")
+            logger.info("🔄 Processing New Batch:")
+            logger.info(f"    Batch ID: {epoch_id}")
+            logger.info(f"    Records: {count}")
             
             if count > 0:
                 # Write to MongoDB
@@ -118,15 +120,17 @@ try:
                     .option("collection", "predictions") \
                     .save()
                 
-                # Log sample prediction
                 sample = df.limit(1).collect()[0]
-                logger.info(f"Sample prediction - ReviewID: {sample['reviewerID']}, "
-                          f"Sentiment: {sample['predicted_sentiment']}")
-                
-            logger.info(f"Successfully processed batch {epoch_id}")
+                logger.info("✅ Sample Prediction:")
+                logger.info(f"    Review ID: {sample['reviewerID']}")
+                logger.info(f"    Sentiment: {sample['predicted_sentiment']}")
+            
+            logger.info("------------------------")
             
         except Exception as e:
-            logger.error(f"Error processing batch {epoch_id}: {str(e)}")
+            logger.error(f"❌ Batch Processing Error:")
+            logger.error(f"    Error: {str(e)}")
+            logger.error("------------------------")
             raise
 
     # 9. Write predictions to MongoDB

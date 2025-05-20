@@ -18,6 +18,11 @@ services:
       KAFKA_CREATE_TOPICS: "reviews:1:1"
     depends_on:
       - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - app-network
 
@@ -67,7 +72,8 @@ services:
     volumes:
       - ./Data:/app/Data
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     networks:
       - app-network
 

@@ -3,7 +3,7 @@ FROM python:3.8-slim
 WORKDIR /app
 
 COPY kafkaProducer/kafkaProducer.py .
-COPY Data/test2_data.json /app/Data/
+COPY Data/test2_data.json/ /app/Data/test2_data.json/
 
 RUN pip install kafka-python
 

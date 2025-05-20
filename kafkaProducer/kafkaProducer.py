@@ -49,7 +49,7 @@ with open(INPUT_FILE, "r", encoding='utf-8') as f:
                 logger.info(f"📊 Progress: Sent {message_count} messages so far")
                 logger.info("------------------------")
             
-            time.sleep(0.1)  # Simulate streaming delay
+            time.sleep(5)  # Simulate streaming delay
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON line: {e}")
 

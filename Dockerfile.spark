@@ -2,18 +2,24 @@ FROM bitnami/spark:latest
 
 USER root
 
+# Install wget for downloading JAR files
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+
+# Install MongoDB Spark Connector
+RUN wget https://repo1.maven.org/maven2/org/mongodb/spark/mongo-spark-connector_2.12/10.2.1/mongo-spark-connector_2.12-10.2.1.jar -P /opt/bitnami/spark/jars/
+
 # Create directories with proper ownership
 RUN mkdir -p /app/Models/Best_SentimentModel && \
     chown -R root:root /app
 
 # Copy your application files
 COPY KafkaConsumer/sparkStreamingConsumer.py /app/
-COPY Models/Best_SentimentModel/ /app/Models/Best_SentimentModel/
+# COPY Models/Best_SentimentModel/ /app/Models/Best_SentimentModel/
 
 # Verify model files exist and set permissions
-RUN ls -la /app/Models/Best_SentimentModel/metadata/part-00000 && \
-    chown -R root:root /app && \
-    chmod -R 777 /app
+# RUN ls -la /app/Models/Best_SentimentModel/metadata/part-00000 && \
+#     chown -R root:root /app && \
+#     chmod -R 777 /app
 
 # Install Python dependencies
 RUN pip install kafka-python pymongo numpy py4j
@@ -21,8 +27,10 @@ RUN pip install kafka-python pymongo numpy py4j
 WORKDIR /app
 
 CMD ["spark-submit", \
-     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5,org.mongodb.spark:mongo-spark-connector_2.12:3.0.1", \
      "--master", "spark://spark-master:7077", \
+     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1", \
+     "--conf", "spark.mongodb.input.uri=mongodb://mongo:27017/", \
+     "--conf", "spark.mongodb.output.uri=mongodb://mongo:27017/", \
      "--conf", "spark.executor.extraJavaOptions=-Dfile.encoding=UTF-8", \
      "--conf", "spark.driver.extraJavaOptions=-Dfile.encoding=UTF-8", \
      "sparkStreamingConsumer.py"]

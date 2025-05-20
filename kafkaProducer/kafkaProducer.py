@@ -4,8 +4,8 @@ import time
 
 # Configuration
 TOPIC = "reviews"
-BOOTSTRAP_SERVERS = ["localhost:9092"]
-INPUT_FILE = "allData.json"  # Make sure this is newline-delimited JSON
+BOOTSTRAP_SERVERS = ["kafka:9092"]
+INPUT_FILE = "../Data/test2_data.json"  # Make sure this is newline-delimited JSON
 
 # Initialize producer
 producer = KafkaProducer(

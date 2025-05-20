@@ -1,0 +1,28 @@
+FROM bitnami/spark:latest
+
+USER root
+
+# Create directories with proper ownership
+RUN mkdir -p /app/Models/Best_SentimentModel && \
+    chown -R root:root /app
+
+# Copy your application files
+COPY KafkaConsumer/sparkStreamingConsumer.py /app/
+COPY Models/Best_SentimentModel/ /app/Models/Best_SentimentModel/
+
+# Verify model files exist and set permissions
+RUN ls -la /app/Models/Best_SentimentModel/metadata/part-00000 && \
+    chown -R root:root /app && \
+    chmod -R 777 /app
+
+# Install Python dependencies
+RUN pip install kafka-python pymongo numpy py4j
+
+WORKDIR /app
+
+CMD ["spark-submit", \
+     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5,org.mongodb.spark:mongo-spark-connector_2.12:3.0.1", \
+     "--master", "spark://spark-master:7077", \
+     "--conf", "spark.executor.extraJavaOptions=-Dfile.encoding=UTF-8", \
+     "--conf", "spark.driver.extraJavaOptions=-Dfile.encoding=UTF-8", \
+     "sparkStreamingConsumer.py"]

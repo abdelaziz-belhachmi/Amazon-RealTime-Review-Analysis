@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-time Sentiment Analysis</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div id="sentiment-pie"></div>
+    <div id="recent-reviews"></div>
+
+    <script>
+        function updateCharts() {
+            fetch('/api/sentiment-data')
+                .then(response => response.json())
+                .then(data => {
+                    const values = data.map(d => d.count);
+                    const labels = data.map(d => 
+                        d._id === 0 ? 'Negative' : 
+                        d._id === 1 ? 'Neutral' : 'Positive'
+                    );
+
+                    const pieData = [{
+                        values: values,
+                        labels: labels,
+                        type: 'pie'
+                    }];
+
+                    Plotly.newPlot('sentiment-pie', pieData);
+                });
+        }
+
+        // Update every 2 seconds
+        setInterval(updateCharts, 2000);
+        updateCharts();
+    </script>
+</body>
+</html>

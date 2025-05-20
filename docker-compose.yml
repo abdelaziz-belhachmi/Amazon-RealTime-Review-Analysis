@@ -5,6 +5,8 @@ services:
     image: wurstmeister/zookeeper
     ports:
       - "2181:2181"
+    networks:
+      - app-network
 
   kafka:
     image: wurstmeister/kafka
@@ -13,8 +15,11 @@ services:
     environment:
       KAFKA_ADVERTISED_HOST_NAME: kafka
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "reviews:1:1"
     depends_on:
       - zookeeper
+    networks:
+      - app-network
 
   mongo:
     image: mongo
@@ -22,32 +27,77 @@ services:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
+    networks:
+      - app-network
 
   spark-master:
     image: bitnami/spark:latest
     environment:
       - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
     ports:
       - "8080:8080"
       - "7077:7077"
     networks:
-      - spark-net
+      - app-network
 
   spark-worker:
     image: bitnami/spark:latest
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=1G
-      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
     depends_on:
       - spark-master
     networks:
-      - spark-net
+      - app-network
+
+  kafka-producer:
+    build:
+      context: .
+      dockerfile: Dockerfile.kafka-producer
+    volumes:
+      - ./Data:/app/Data
+    depends_on:
+      - kafka
+    networks:
+      - app-network
+
+  spark-streaming:
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    depends_on:
+      - spark-master
+      - kafka
+      - mongo
+    networks:
+      - app-network
+    volumes:
+      - ./Models:/app/Models:ro
+
+  visualization:
+    build:
+      context: .
+      dockerfile: Dockerfile.visualization
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongo
+    networks:
+      - app-network
 
 volumes:
   mongo-data:
 
 networks:
-  spark-net:
+  app-network:
     driver: bridge

@@ -4,7 +4,7 @@ import os
 
 # Parameters
 TOPIC = "reviews"
-BOOTSTRAP_SERVERS = ["localhost:9092"]  # Adjust if your Kafka broker is on another host/port
+BOOTSTRAP_SERVERS = ["kafka:9092"]  # Adjust if your Kafka broker is on another host/port
 OUTPUT_FILE = "../Data/Data.json"
 
 # Ensure output directory exists

@@ -3,6 +3,6 @@ FROM python:3.8-slim
 WORKDIR /app
 
 COPY visualization/ .
-RUN pip install flask pymongo plotly
+RUN pip install flask pymongo plotly pytz
 
 CMD ["python", "app.py"]

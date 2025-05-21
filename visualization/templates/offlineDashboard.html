@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Amazon Reviews Analysis Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Amazon Reviews Sentiment Analysis</h1>
+    <div class="charts-grid">
+        <div class="chart-container">
+            <div id="sentiment-pie"></div>
+        </div>
+        <div class="chart-container">
+            <div id="sentiment-timeline"></div>
+        </div>
+    </div>
+
+    <script>
+        function updateCharts() {
+            // Update pie chart
+            fetch('/api/overall-sentiment')
+                .then(response => response.json())
+                .then(data => {
+                    const pieData = [{
+                        values: data.map(d => d.count),
+                        labels: data.map(d => 
+                            d._id === 0 ? 'Negative' : 
+                            d._id === 1 ? 'Neutral' : 'Positive'
+                        ),
+                        type: 'pie',
+                        marker: {
+                            colors: ['#ff6b6b', '#ffd93d', '#6bcb77']
+                        }
+                    }];
+
+                    const pieLayout = {
+                        title: 'Overall Sentiment Distribution',
+                        height: 400,
+                        showlegend: true
+                    };
+
+                    Plotly.newPlot('sentiment-pie', pieData, pieLayout);
+                });
+
+            // Update timeline chart
+            fetch('/api/sentiment-by-date')
+                .then(response => response.json())
+                .then(data => {
+                    const traces = [
+                        {
+                            name: 'Negative',
+                            type: 'bar',
+                            x: data.map(d => d.date),
+                            y: data.map(d => d.negative || 0),
+                            marker: {color: '#ff6b6b'}
+                        },
+                        {
+                            name: 'Neutral',
+                            type: 'bar',
+                            x: data.map(d => d.date),
+                            y: data.map(d => d.neutral || 0),
+                            marker: {color: '#ffd93d'}
+                        },
+                        {
+                            name: 'Positive',
+                            type: 'bar',
+                            x: data.map(d => d.date),
+                            y: data.map(d => d.positive || 0),
+                            marker: {color: '#6bcb77'}
+                        }
+                    ];
+
+                    const layout = {
+                        title: 'Daily Sentiment Analysis',
+                        barmode: 'stack',
+                        height: 400,
+                        xaxis: {
+                            title: 'Date',
+                            tickangle: -45
+                        },
+                        yaxis: {
+                            title: 'Number of Reviews'
+                        }
+                    };
+
+                    Plotly.newPlot('sentiment-timeline', traces, layout);
+                });
+        }
+
+        // Initial update and set interval
+        updateCharts();
+        setInterval(updateCharts, 30000); // Update every 30 seconds
+    </script>
+</body>
+</html>

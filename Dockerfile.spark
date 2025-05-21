@@ -6,7 +6,11 @@ USER root
 RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
 
 # Install MongoDB Spark Connector
-RUN wget https://repo1.maven.org/maven2/org/mongodb/spark/mongo-spark-connector_2.12/10.2.1/mongo-spark-connector_2.12-10.2.1.jar -P /opt/bitnami/spark/jars/
+# Install MongoDB Spark Connector
+RUN wget https://repo1.maven.org/maven2/org/mongodb/spark/mongo-spark-connector_2.12/3.0.1/mongo-spark-connector_2.12-3.0.1.jar -P /opt/bitnami/spark/jars/ && \
+    wget https://repo1.maven.org/maven2/org/mongodb/mongodb-driver-sync/4.11.1/mongodb-driver-sync-4.11.1.jar -P /opt/bitnami/spark/jars/ && \
+    wget https://repo1.maven.org/maven2/org/mongodb/mongodb-driver-core/4.11.1/mongodb-driver-core-4.11.1.jar -P /opt/bitnami/spark/jars/ && \
+    wget https://repo1.maven.org/maven2/org/mongodb/bson/4.11.1/bson-4.11.1.jar -P /opt/bitnami/spark/jars/
 
 # Create directories with proper ownership
 RUN mkdir -p /app/Models/Best_SentimentModel && \
@@ -26,11 +30,18 @@ RUN pip install kafka-python pymongo numpy py4j
 
 WORKDIR /app
 
+# CMD ["spark-submit", \
+#      "--master", "spark://spark-master:7077", \
+#      "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1", \
+#      "--conf", "spark.mongodb.input.uri=mongodb://mongo:27017/", \
+#      "--conf", "spark.mongodb.output.uri=mongodb://mongo:27017/", \
+#      "--conf", "spark.executor.extraJavaOptions=-Dfile.encoding=UTF-8", \
+#      "--conf", "spark.driver.extraJavaOptions=-Dfile.encoding=UTF-8", \
+#      "sparkStreamingConsumer.py"]
+
 CMD ["spark-submit", \
-     "--master", "spark://spark-master:7077", \
-     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1", \
-     "--conf", "spark.mongodb.input.uri=mongodb://mongo:27017/", \
-     "--conf", "spark.mongodb.output.uri=mongodb://mongo:27017/", \
-     "--conf", "spark.executor.extraJavaOptions=-Dfile.encoding=UTF-8", \
-     "--conf", "spark.driver.extraJavaOptions=-Dfile.encoding=UTF-8", \
-     "sparkStreamingConsumer.py"]
+"--master", "spark://spark-master:7077", \
+"--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5,org.mongodb.spark:mongo-spark-connector_2.12:3.0.1", \
+"--conf", "spark.executor.extraJavaOptions=-Dfile.encoding=UTF-8", \
+"--conf", "spark.driver.extraJavaOptions=-Dfile.encoding=UTF-8", \
+"sparkStreamingConsumer.py"]

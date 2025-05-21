@@ -5,6 +5,10 @@ import os
 import logging
 from threading import Thread
 import time
+from pyspark.sql.functions import when
+from pyspark.ml import Pipeline
+from pyspark.ml.feature import Tokenizer, StopWordsRemover, HashingTF, IDF
+from pyspark.ml.classification import LogisticRegression
 
 # Configure logging
 logging.basicConfig(
@@ -20,7 +24,10 @@ try:
         .appName("Real-time Review Analysis") \
         .config("spark.jars.packages", 
                 "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5,"
-                "org.mongodb.spark:mongo-spark-connector_2.12:10.2.1") \
+                "org.mongodb.spark:mongo-spark-connector_2.12:3.0.1,"
+                "org.mongodb:mongodb-driver-sync:4.11.1,"
+                "org.mongodb:mongodb-driver-core:4.11.1,"
+                "org.mongodb:bson:4.11.1") \
         .config("spark.mongodb.output.uri", "mongodb://mongo:27017/sentiment.predictions") \
         .config("spark.mongodb.write.connection.uri", "mongodb://mongo:27017") \
         .config("spark.mongodb.write.database", "sentiment") \
@@ -41,32 +48,26 @@ try:
         StructField("unixReviewTime", FloatType(), True),
         StructField("reviewTime", StringType(), True)
     ])
+    # 3. Model Pipeline
+    logger.info("Setting up ML Pipeline...")
+    
+    # Create pipeline stages
+    tokenizer = Tokenizer(inputCol="reviewText", outputCol="words")
+    remover = StopWordsRemover(inputCol="words", outputCol="filtered")
+    hashingTF = HashingTF(inputCol="filtered", outputCol="rawFeatures", numFeatures=10000)
+    idf = IDF(inputCol="rawFeatures", outputCol="features")
+    lr = LogisticRegression(
+        maxIter=20,
+        regParam=1.0,
+        elasticNetParam=0.0,
+        featuresCol="features",
+        labelCol="label",
+        predictionCol="predicted_sentiment"
+    )
 
-    def analyze_sentiment(text, rating):
-        # Classify based on the rating (overall) according to Amazon's rules
-        if rating > 3.0:
-            return 1  # Positive
-        elif rating < 3.0:
-            return 0  # Negative
-        else:
-            # For neutral ratings (overall = 3), use text analysis as fallback
-            positive_words = {'good', 'great', 'nice', 'excellent', 'love', 'perfect', 'best', 
-                            'recommend', 'worth', 'quality', 'satisfied', 'happy', 'helpful'}
-            negative_words = {'bad', 'poor', 'terrible', 'worst', 'hate', 'awful', 'disappointing',
-                            'waste', 'defective', 'broken', 'cheap', 'return', 'refund'}
-            
-            text = text.lower()
-            pos_count = sum(1 for word in positive_words if word in text)
-            neg_count = sum(1 for word in negative_words if word in text)
-            
-            # If equal counts or no sentiment words found, return neutral (2)
-            if pos_count == neg_count:
-                return 2  # Neutral
-            return 1 if pos_count > neg_count else 0
-
-    # Register UDF with three possible outcomes (0: Negative, 1: Positive, 2: Neutral)
-    sentiment_udf = udf(analyze_sentiment, IntegerType())
-    spark.udf.register("analyze_sentiment", sentiment_udf)
+    # Create pipeline
+    pipeline = Pipeline(stages=[tokenizer, remover, hashingTF, idf, lr])
+    logger.info("ML Pipeline created successfully")
 
     # ... rest of the streaming setup ...
 
@@ -88,10 +89,31 @@ try:
         .select("data.*")
 
     # 6. Apply sentiment analysis
-    predictions = parsed_df.withColumn(
-        "predicted_sentiment",
-        sentiment_udf(col("reviewText"), col("overall"))
+    # Create a small sample dataset with the same schema
+    sample_data = spark.createDataFrame([
+        ("This is a good product", 5.0),
+        ("This is a bad product", 1.0),
+        ("Average product", 3.0)
+    ], ["reviewText", "overall"])
+    
+    # Add label column to sample data
+    sample_data = sample_data.withColumn(
+        "label",
+        when(col("overall") > 3.0, 1.0)
+        .when(col("overall") < 3.0, 0.0)
+        .otherwise(2.0)
     )
+    
+    # Fit the pipeline once
+    pipeline_model = pipeline.fit(sample_data)
+    
+    # Use the fitted model for streaming predictions
+    predictions = pipeline_model.transform(parsed_df.withColumn(
+        "label",
+        when(col("overall") > 3.0, 1.0)
+        .when(col("overall") < 3.0, 0.0)
+        .otherwise(2.0)
+    ))
     logger.info("Sentiment analysis transformation setup complete")
 
     # 7. Select relevant columns and prepare for MongoDB
@@ -117,17 +139,19 @@ try:
             logger.info(f"    Records: {count}")
             
             if count > 0:
-                # Write to MongoDB
+                # Write to MongoDB using newer configuration
+                logger.info("Writing to MongoDB...")
                 df.write \
-                    .format("mongodb") \
+                    .format("com.mongodb.spark.sql.DefaultSource") \
                     .mode("append") \
                     .option("database", "sentiment") \
                     .option("collection", "predictions") \
+                    .option("uri", "mongodb://mongo:27017") \
                     .save()
-                
+                logger.info("✅ Data Saved")
                 sample = df.limit(1).collect()[0]
                 logger.info("✅ Sample Prediction:")
-                logger.info(f"    Review ID: {sample['reviewerID']}")
+                logger.info(f"    Review ID: {sample['reviewer_id']}")
                 logger.info(f"    Sentiment: {sample['predicted_sentiment']}")
             
             logger.info("------------------------")
@@ -142,7 +166,7 @@ try:
     logger.info("Starting MongoDB stream...")
     query = output_df.writeStream \
         .foreachBatch(process_batch) \
-        .outputMode("update") \
+        .outputMode("append") \
         .trigger(processingTime="5 seconds") \
         .start()
 
